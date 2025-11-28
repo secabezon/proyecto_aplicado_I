@@ -1,0 +1,1 @@
+EMBEDDING_MODEL = "thenlper/gte-large"

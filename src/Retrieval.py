@@ -1,39 +1,49 @@
 from langchain_qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from sentence_transformers import SentenceTransformer
+from langchain_community.embeddings import HuggingFaceEmbeddings
+
+from pathlib import Path
+import sys
+root = Path(__file__).resolve().parents[1]
+sys.path.append(str(root))
+from config.config import EMBEDDING_MODEL
+
 
 def retrieve(
+    client,
     query: str,
     k: int = 5,
-    doc_id: dict | None = None,
+    doc_id: str | int | None = None,
 ):
-
-    client = QdrantClient(path="../data/tmp/langchain_qdrant")
-    embedding_model = SentenceTransformer(
-    "mistralai/Mistral-Small-Embeddings-v0.1"
+    embedding_model = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL
     )
+
     qdrant = QdrantVectorStore(
         client=client,
         collection_name="bioactives_collection",
         embedding=embedding_model,
     )
 
+    qdrant_filter = None
+
+    if doc_id is not None:
+        qdrant_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="metadata.doc_id",
+                    match=models.MatchValue(
+                        value=doc_id  # <-- ahora es str/int, NO dict
+                    )
+                )
+            ]
+        )
+
     results = qdrant.search(
-        query,
+        query=query,
         k=k,
         search_type="mmr",
-        filter=models.Filter(
-        must=[
-            models.FieldCondition(
-                key="metadata.doc_id",
-                match=models.MatchValue(
-                    value=doc_id
-                    ),
-                ),
-            ]
-        ),
+        filter=qdrant_filter,
     )
-
 
     return results

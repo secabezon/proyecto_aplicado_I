@@ -1,34 +1,38 @@
 import numpy as np
-from pathlib import Path
 import json
 from langchain_qdrant import QdrantVectorStore, FastEmbedSparse
-from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
-from sentence_transformers import SentenceTransformer
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
 
+from pathlib import Path
+import sys
+root = Path(__file__).resolve().parents[1]
+sys.path.append(str(root))
+from config.config import EMBEDDING_MODEL
 
-def vector_store_config():
+def vector_store_config(client):
     chunks_path = Path("../data/chunks.json")
 
     with open(chunks_path, "r", encoding="utf-8") as file:
         chunks = json.load(file)
     docs = []
 
-    embedding_model = SentenceTransformer(
-    "mistralai/Mistral-Small-Embeddings-v0.1"
+    embedding_model = HuggingFaceEmbeddings(
+    model_name=EMBEDDING_MODEL
     )
     for chunk in chunks:
         docs.append(
-            {
-                "id": chunk['chunk_id'],
-                "payload": {
-                    "text": chunk['text'],
-                    "metadata": {'order':chunk['order'], 'doc_id':chunk['doc_id']}
-                }
+            Document(
+            page_content=chunk["text"],
+            metadata={
+                "order": chunk["order"],
+                "doc_id": chunk["doc_id"],
+                "chunk_id": chunk["chunk_id"],  # <-- acá agregas tu propio id
             }
         )
+        )
 
-    client = QdrantClient(path="../data/tmp/langchain_qdrant")
 
     for col in client.get_collections().collections:
         client.delete_collection(collection_name=col.name)
