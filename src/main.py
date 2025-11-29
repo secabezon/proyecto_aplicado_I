@@ -42,7 +42,7 @@ st.subheader("Evaluar desempeño del recuperador (Benchmark)")
 if st.button("Ejecutar Benchmark"):
     metrics = eval_metrics_at_k(client, k=5)
 
-    st.write(f"**Precision@5:** {metrics['precision_at_k']:.3f}")
+    st.write(f"**Precision@5:** {metrics['position_weighted_precision_at_k']:.3f}")
     st.write(f"**Recall@5:** {metrics['recall_at_k']:.3f}")
 
     # Detalle por query
@@ -52,7 +52,7 @@ if st.button("Ejecutar Benchmark"):
             "query": row["query"],
             "retrieved": row["retrieved_doc_ids"],
             "relevant": row["relevant_doc_ids"],
-            "precision": row["precision"],
+            "precision": row["position_weighted_precision_at_k"],
             "recall": row["recall"],
             "hits": row["num_hits"],
         })
