@@ -12,7 +12,9 @@ sys.path.append(str(root))
 from config.config import EMBEDDING_MODEL
 
 def vector_store_config(client):
-    chunks_path = Path("../data/chunks.json")
+    import os
+
+    chunks_path = Path("data/chunks.json")
 
     with open(chunks_path, "r", encoding="utf-8") as file:
         chunks = json.load(file)
