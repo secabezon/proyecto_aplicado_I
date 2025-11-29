@@ -7,7 +7,9 @@
     "query": "Which natural antimicrobial compounds from plants can be used as food preservatives?",
     "relevant_doc_ids": {'order':91, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
   },
-  
-
+  {
+    "query": "What is a food colorant?",
+    "relevant_doc_ids": {'order':30, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
+  },
 
 ]
