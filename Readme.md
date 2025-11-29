@@ -75,9 +75,15 @@ Interfaz de consulta mediante Streamlit.
 ## Benchmarking
 
 Metricas Globales
+
+
+
 ![Métricas del sistema](docs/img/Metricas1.jpg)
 
 Metricas por un ejemplo
+
+
+
 ![Métricas del sistema](docs/img/Metricas2.jpg)
 
 
