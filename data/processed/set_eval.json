@@ -1,0 +1,22 @@
+[
+  {
+    "query": "actividad antidiabética del compuesto con m/z 449.107",
+    "relevant_doc_ids": ["myricetin_01", "bioactive_diabetes_review"]
+  },
+  {
+    "query": "inhibición de la agregación plaquetaria por flavonoides",
+    "relevant_doc_ids": ["platelet_aggregation_study"]
+  },
+  {
+    "query": "propiedades antioxidantes de los compuestos fenólicos",
+    "relevant_doc_ids": ["phenolic_antioxidants_overview", "myricetin_01"]
+  },
+  {
+    "query": "evidencia sobre la toxicidad del myricetin en modelos animales",
+    "relevant_doc_ids": ["myricetin_toxicity_study"]
+  },
+  {
+    "query": "estudios clínicos de flavonoides para resistencia a la insulina",
+    "relevant_doc_ids": ["flavonoid_clinical_trials"]
+  }
+]
