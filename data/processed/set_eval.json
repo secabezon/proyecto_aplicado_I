@@ -1,19 +1,19 @@
 [
   {
     "query": "What are the main health concerns associated with synthetic food colorants like tartrazine?",
-    "relevant_doc_ids": {'order': 39, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
+    "relevant_doc_ids": {"order": 39, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
   },
   {
     "query": "Which natural antimicrobial compounds from plants can be used as food preservatives?",
-    "relevant_doc_ids": {'order':91, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
+    "relevant_doc_ids": {"order":91, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
   },
   {
     "query": "What is a food colorant?",
-    "relevant_doc_ids": {'order':30, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
+    "relevant_doc_ids": {"order":30, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
   },
   {
     "query": "What are the main differences between synthetic and natural food colorants?",
-    "relevant_doc_ids": {'order':44, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
-  },
+    "relevant_doc_ids": {"order":44, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
+  }
 
 ]

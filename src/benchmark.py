@@ -15,9 +15,7 @@ def position_weighted_precision(retrieved_ids, relevant_ids):
             return 1 / i
     return 0.0
 
-import os
-print(os.getcwd())
-EVAL_PATH = Path("../data/processed/set_eval.json")
+EVAL_PATH = Path("data/processed/set_eval.json")
 
 DEFAULT_EVAL_SET = [
   {
