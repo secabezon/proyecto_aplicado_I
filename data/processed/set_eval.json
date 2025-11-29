@@ -11,5 +11,9 @@
     "query": "What is a food colorant?",
     "relevant_doc_ids": {'order':30, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
   },
+  {
+    "query": "What are the main differences between synthetic and natural food colorants?",
+    "relevant_doc_ids": {'order':44, 'doc_id': 'Natural_Food_Colorants_and_Preservatives'},
+  },
 
 ]
