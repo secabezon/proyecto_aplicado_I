@@ -1,24 +1,9 @@
-
-from huggingface_hub import InferenceClient
-from pathlib import Path
-
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-HF_TOKEN = os.getenv("HF_TOKEN")
-import sys
-root = Path(__file__).resolve().parents[1]
-sys.path.append(str(root))
-from config.config import CHAT_MODEL
-
+from LLM_prompt import llm_prompt
 
 
 def rePank(query: str, doc: str
 ):
     
-    client = InferenceClient(token=HF_TOKEN)
     prompt = f"""You are a precise text extraction assistant. Your task is to extract ONLY the sentences or phrases from the given document that are directly relevant to answering the user's query.
 
     Rules:
@@ -35,13 +20,8 @@ def rePank(query: str, doc: str
 
     Relevant extractions:"""
 
-
-    completion = client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=[
+    message=[
             {"role": "user", "content": prompt}
-        ],
-        temperature=0 
-    )
-
-    return completion.choices[0].message.content.strip()
+        ]
+    response=llm_prompt(message,0)
+    return response.choices[0].message.content.strip()

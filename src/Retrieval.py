@@ -1,14 +1,7 @@
 from langchain_qdrant import QdrantVectorStore, FastEmbedSparse, RetrievalMode
 from qdrant_client.http import models
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from huggingface_hub import InferenceClient
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-HF_TOKEN = os.getenv("HF_TOKEN")
-
+from LLM_prompt import llm_prompt
 from pathlib import Path
 import sys
 root = Path(__file__).resolve().parents[1]
@@ -33,15 +26,11 @@ def extract_self_query(query: str):
     User query:
     {query}
     """
-    client = InferenceClient(token=HF_TOKEN)
-    response = client.text_generation(
-        prompt,
-        model="google/flan-t5-base",
-        max_new_tokens=200,
-        temperature=0.0
-    )
-
-    return response.generated_text
+    message=[
+        {"role": "user", "content": prompt}
+    ]
+    response=llm_prompt(message,0)
+    return response.choices[0].message.content
 
 def retrieve(
     client,
