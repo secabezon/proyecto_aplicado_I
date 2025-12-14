@@ -3,3 +3,4 @@ data/tmp
 src/__pycache__
 config/__pycache__
 outputs/ingest/
+.env
