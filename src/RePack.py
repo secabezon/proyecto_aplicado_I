@@ -1,7 +1,7 @@
 from LLM_prompt import llm_prompt
 
 
-def rePank(query: str, doc: str
+def rePack(query: str, doc: str
 ):
     
     prompt = f"""You are a precise text extraction assistant. Your task is to extract ONLY the sentences or phrases from the given document that are directly relevant to answering the user's query.
@@ -24,4 +24,4 @@ def rePank(query: str, doc: str
             {"role": "user", "content": prompt}
         ]
     response=llm_prompt(message,0)
-    return response.choices[0].message.content.strip()
+    return response

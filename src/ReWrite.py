@@ -16,8 +16,7 @@ def response_hyde(query: str
     message=[
             {"role": "user", "content": hyde_prompt}
         ]
-    response=llm_prompt(message,0)
-    hypothetical_document = response.choices[0].message.content
+    hypothetical_document=llm_prompt(message,0)
 
 
     return hypothetical_document
@@ -37,7 +36,7 @@ def descomposition_query(query: str
         ]
     response_format={"type": "json_object"}
     response=llm_prompt(message,0,response_format)
-    sub_queries = json.loads(response.choices[0].message.content)["queries"]    
+    sub_queries = json.loads(response)["queries"]    
 
 
     return sub_queries
@@ -60,7 +59,7 @@ def stepback_query(query: str
            {"role": "user", "content": step_back_prompt}
         ]
     response=llm_prompt(message,0)
-    step_back_query = response.choices[0].message.content.strip()   
+    step_back_query = response.strip()   
 
 
     return step_back_query

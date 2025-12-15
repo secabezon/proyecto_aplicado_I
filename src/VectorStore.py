@@ -1,7 +1,8 @@
-import numpy as np
+
 import json
+from qdrant_client.http.models import Distance, VectorParams, SparseVectorParams
+
 from langchain_qdrant import QdrantVectorStore, FastEmbedSparse, RetrievalMode
-from qdrant_client.http.models import Distance, VectorParams
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
@@ -29,7 +30,7 @@ def vector_store_config(client):
             metadata={
                 "order": chunk["order"],
                 "doc_id": chunk["doc_id"],
-                "chunk_id": chunk["chunk_id"],  # <-- acá agregas tu propio id
+                "chunk_id": chunk["chunk_id"],
             }
         )
         )
@@ -38,9 +39,15 @@ def vector_store_config(client):
     for col in client.get_collections().collections:
         client.delete_collection(collection_name=col.name)
 
-    client.create_collection(
-    collection_name="bioactives_collection",
-    vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
+    client.recreate_collection(
+        collection_name="bioactives_collection",
+        vectors_config=VectorParams(
+            size=384,              
+            distance=Distance.COSINE
+        ),
+        sparse_vectors_config={
+            "langchain-sparse": SparseVectorParams()
+        }
     )
 
     vector_store = QdrantVectorStore(

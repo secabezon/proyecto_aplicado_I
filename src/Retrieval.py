@@ -3,6 +3,7 @@ from qdrant_client.http import models
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from LLM_prompt import llm_prompt
 from pathlib import Path
+import json
 import sys
 root = Path(__file__).resolve().parents[1]
 sys.path.append(str(root))
@@ -17,7 +18,7 @@ def extract_self_query(query: str):
     Allowed fields:
     - doc_id (string)
 
-    If no filter is present, return null.
+    If no filter is present, return None.
 
     Return ONLY valid JSON with keys:
     - query_text
@@ -30,12 +31,18 @@ def extract_self_query(query: str):
         {"role": "user", "content": prompt}
     ]
     response=llm_prompt(message,0)
-    return response.choices[0].message.content
+    print(response)
+    print('-----type------',type(json.loads(response)))
+    try:
+        return json.loads(response)['filters']['doc_id']
+    except:
+        return None
 
 def retrieve(
     client,
     query: str,
-    k: int = 5
+    k: int = 5,
+    doc_id: str = None
 ):
     embedding_model = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL
@@ -49,8 +56,9 @@ def retrieve(
         sparse_embedding=sparse_embeddings,
         retrieval_mode=RetrievalMode.HYBRID
     )
-
-    doc_id=extract_self_query(query)['doc_id']
+    
+    if doc_id in ("None","null"):
+        doc_id=None
     qdrant_filter=None
     if doc_id is not None:
         qdrant_filter = models.Filter(
@@ -67,7 +75,14 @@ def retrieve(
     results = qdrant.search(
         query=query,
         k=k,
+        search_type="similarity",
         filter=qdrant_filter
     )
+    unique={}
+    for r in results:
+        cid = r.metadata["chunk_id"]
+        if cid not in unique:
+            unique[cid] = r
 
+    results = list(unique.values())
     return results

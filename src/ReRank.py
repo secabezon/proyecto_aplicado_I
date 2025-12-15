@@ -12,14 +12,19 @@ from config.config import CROSSENCODER_MODEL
 def reRank(query: str,chunks: List
 ):
     cross_encoder = CrossEncoder(CROSSENCODER_MODEL)
-    pairs = [[query, doc] for doc in chunks]
+    pairs = [[query,  doc.page_content] for doc in chunks]
     scores = cross_encoder.predict(pairs)
 
     results_with_scores = [
-        (doc_id, score)
-        for doc_id, score in zip(chunks, scores)
+        {
+            "doc_id": doc.metadata["doc_id"],
+            "chunk_id": doc.metadata["chunk_id"],
+            "content": doc.page_content,
+            "score": float(score)
+        }
+        for doc, score in zip(chunks, scores)
     ]
 
-    best_result = sorted(results_with_scores, key=lambda x: x[2], reverse=True)[:1]
+    best_result = sorted(results_with_scores, key=lambda x: x["score"],  reverse=True)[:3]
 
     return best_result

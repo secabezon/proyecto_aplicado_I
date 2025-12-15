@@ -1,9 +1,12 @@
 import streamlit as st
-from Retrieval import retrieve
+from Retrieval import retrieve, extract_self_query
 from VectorStore import vector_store_config
 from qdrant_client import QdrantClient
 from DataIngest import main
-from benchmark import eval_metrics_at_k  # <-- IMPORTANTE
+from benchmark import eval_metrics_at_k
+from RePack import rePack
+from ReRank import reRank
+from ReWrite import response_hyde, stepback_query, descomposition_query
 
 
 st.title("RAG Biotechnologies")
@@ -14,10 +17,10 @@ st.title("RAG Biotechnologies")
 if "pipeline_ready" not in st.session_state:
     st.write("Preparando datos...")
 
-    main()  # genera chunks
+    main() 
     client = QdrantClient(path="../data/tmp/langchain_qdrant")
-    vector_store_config(client)  # crea colección y sube embeddings
 
+    vector_store_config(client)
     st.session_state.client = client
     st.session_state.pipeline_ready = True
     st.success("Pipeline listo.")
@@ -28,11 +31,30 @@ client = st.session_state.client
 # CONSULTA
 # --------------------------------------------------------------------
 query = st.text_input("Pregunta sobre los archivos")
-
 if st.button("Enviar"):
     response = retrieve(client, query)
-    st.subheader("Respuesta Recuperada:")
+    st.subheader("Respuesta Recuperada naive:")
     st.write(response)
+    st.subheader("Respuesta Recuperada Mejorada:")
+    doc_id=extract_self_query(query)
+    descomposition_querys=descomposition_query(query)
+    answers=[]
+    for desc_query in descomposition_querys:
+        hyde=response_hyde(desc_query)
+        response = retrieve(client, hyde, doc_id=doc_id)
+        rerank=reRank(query,response)
+        for i in rerank:
+            repack=rePack(query,i['content'])
+            if repack != 'NO_RELEVANT_CONTENT':
+                answers.append(repack)
+    # st.write('------------hyde-----------')
+    # st.write(hyde)
+    # st.write('------------Normal-----------')
+    # st.write(response)
+    # st.write('------------Rerank-----------')
+    # st.write(rerank)
+    # st.write('------------Final-----------')
+    st.write(answers)
 
 # --------------------------------------------------------------------
 # BENCHMARK
