@@ -94,7 +94,8 @@ def eval_metrics_at_k(client, k: int = 5, eval_set=None):
         #     response = retrieve(client, desc_query)
         #     rerank=reRank(desc_query,response)
 
-        response = retrieve(client, query,k=20)
+        response = retrieve(client, query,k=k)
+        print('---------------len response--------------',len(response))
         rerank=reRank(query,response)
         print(rerank)
         retrieved_ids_processed = [

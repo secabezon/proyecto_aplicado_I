@@ -62,7 +62,7 @@ if st.button("Enviar"):
 st.subheader("Evaluar desempeño del recuperador (Benchmark)")
 
 if st.button("Ejecutar Benchmark"):
-    metrics = eval_metrics_at_k(client, k=5)
+    metrics = eval_metrics_at_k(client, k=100)
 
 
     st.subheader("Evaluación con RAG Naive")

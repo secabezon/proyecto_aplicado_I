@@ -74,7 +74,7 @@ def retrieve(
 
     results = qdrant.search(
         query=query,
-        k=k,
+        k=k * 3,
         search_type="similarity",
         filter=qdrant_filter
     )
@@ -84,5 +84,5 @@ def retrieve(
         if cid not in unique:
             unique[cid] = r
 
-    results = list(unique.values())
+    results = list(unique.values())[:k]
     return results
