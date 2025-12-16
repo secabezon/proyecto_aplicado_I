@@ -64,12 +64,33 @@ st.subheader("Evaluar desempeño del recuperador (Benchmark)")
 if st.button("Ejecutar Benchmark"):
     metrics = eval_metrics_at_k(client, k=5)
 
-    st.write(f"**Precision@5:** {metrics['precision_at_k']:.3f}")
-    st.write(f"**Recall@5:** {metrics['recall_at_k']:.3f}")
+
+    st.subheader("Evaluación con RAG Naive")
+    st.write(f"**Precision@5 Naive:** {metrics['precision_at_k_naive']:.3f}")
+    st.write(f"**Recall@5 Naive:** {metrics['recall_at_k_naive']:.3f}")
 
     # Detalle por query
     st.write("### Detalle por consulta")
-    for row in metrics["per_query"]:
+    for row in metrics["per_query_naive"]:
+        st.write({
+            "query": row["query"],
+            "retrieved": row["retrieved_doc_ids"],
+            "relevant": row["relevant_doc_ids"],
+            "precision": row["precision"],
+            "recall": row["recall"],
+            "hits": row["num_hits"],
+        })
+
+    
+    st.subheader("Evaluación con RAG Processed")
+
+
+    st.write(f"**Precision@5 Processed:** {metrics['precision_at_k_processed']:.3f}")
+    st.write(f"**Recall@5 Processed:** {metrics['recall_at_k_processed']:.3f}")
+
+    # Detalle por query
+    st.write("### Detalle por consulta")
+    for row in metrics["per_query_processed"]:
         st.write({
             "query": row["query"],
             "retrieved": row["retrieved_doc_ids"],

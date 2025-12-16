@@ -19,12 +19,13 @@ def reRank(query: str,chunks: List
         {
             "doc_id": doc.metadata["doc_id"],
             "chunk_id": doc.metadata["chunk_id"],
+            "order": doc.metadata["order"],
             "content": doc.page_content,
             "score": float(score)
         }
         for doc, score in zip(chunks, scores)
     ]
 
-    best_result = sorted(results_with_scores, key=lambda x: x["score"],  reverse=True)[:3]
+    best_result = sorted(results_with_scores, key=lambda x: x["score"],  reverse=True)[:5]
 
     return best_result
