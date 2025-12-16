@@ -1,7 +1,8 @@
-import numpy as np
+
 import json
-from langchain_qdrant import QdrantVectorStore, FastEmbedSparse
-from qdrant_client.http.models import Distance, VectorParams
+from qdrant_client.http.models import Distance, VectorParams, SparseVectorParams
+
+from langchain_qdrant import QdrantVectorStore, FastEmbedSparse, RetrievalMode
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
@@ -12,8 +13,7 @@ sys.path.append(str(root))
 from config.config import EMBEDDING_MODEL
 
 def vector_store_config(client):
-    import os
-
+    sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
     chunks_path = Path("data/chunks.json")
 
     with open(chunks_path, "r", encoding="utf-8") as file:
@@ -30,7 +30,7 @@ def vector_store_config(client):
             metadata={
                 "order": chunk["order"],
                 "doc_id": chunk["doc_id"],
-                "chunk_id": chunk["chunk_id"],  # <-- acá agregas tu propio id
+                "chunk_id": chunk["chunk_id"],
             }
         )
         )
@@ -39,14 +39,22 @@ def vector_store_config(client):
     for col in client.get_collections().collections:
         client.delete_collection(collection_name=col.name)
 
-    client.create_collection(
-    collection_name="bioactives_collection",
-    vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
+    client.recreate_collection(
+        collection_name="bioactives_collection",
+        vectors_config=VectorParams(
+            size=384,              
+            distance=Distance.COSINE
+        ),
+        sparse_vectors_config={
+            "langchain-sparse": SparseVectorParams()
+        }
     )
 
     vector_store = QdrantVectorStore(
         client=client,
         collection_name="bioactives_collection",
-        embedding=embedding_model
+        embedding=embedding_model,
+        sparse_embedding=sparse_embeddings,
+        retrieval_mode=RetrievalMode.HYBRID
     )
     vector_store.add_documents(docs)
