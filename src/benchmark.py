@@ -87,6 +87,13 @@ def eval_metrics_at_k(client, k: int = 5, eval_set=None):
 
     
 
+        # descomposition_querys=descomposition_query(query)
+        # for desc_query in descomposition_querys:
+        #     # sq=stepback_query(desc_query)
+            # hyde=response_hyde(desc_query)
+        #     response = retrieve(client, desc_query)
+        #     rerank=reRank(desc_query,response)
+
         response = retrieve(client, query,k=20)
         rerank=reRank(query,response)
         print(rerank)

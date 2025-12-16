@@ -9,5 +9,5 @@ OVERLAP = 50
 LOG_LEVEL = "INFO"
 #LLM IMPROVE QUERY
 # CHAT_MODEL="meta-llama/Meta-Llama-3-8B-Instruct"
-CHAT_MODEL="flan-t5-base"
+CHAT_MODEL="mistralai/Mistral-7B-Instruct-v0.2"
 CROSSENCODER_MODEL="cross-encoder/ms-marco-MiniLM-L-6-v2"
