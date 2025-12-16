@@ -8,5 +8,6 @@ WORDS_PER_CHUNK = 100
 OVERLAP = 50
 LOG_LEVEL = "INFO"
 #LLM IMPROVE QUERY
-CHAT_MODEL="meta-llama/Meta-Llama-3-8B-Instruct"
+# CHAT_MODEL="meta-llama/Meta-Llama-3-8B-Instruct"
+CHAT_MODEL="flan-t5-base"
 CROSSENCODER_MODEL="cross-encoder/ms-marco-MiniLM-L-6-v2"

@@ -87,19 +87,9 @@ def eval_metrics_at_k(client, k: int = 5, eval_set=None):
 
     
 
-        descomposition_querys=descomposition_query(query)
-        for desc_query in descomposition_querys:
-            sq=stepback_query(desc_query)
-            hyde=response_hyde(desc_query)
-            response = retrieve(client, sq)
-            rerank=reRank(sq,response)
-
-        # sq=stepback_query(query)
-
-        # hyde=response_hyde(sq)
-        # response = retrieve(client, sq)
-        # rerank=reRank(sq,response)
-        # print(rerank)
+        response = retrieve(client, query,k=20)
+        rerank=reRank(query,response)
+        print(rerank)
         retrieved_ids_processed = [
                                     f"{d['doc_id']}:{d['order']}"
                                     for d in rerank
