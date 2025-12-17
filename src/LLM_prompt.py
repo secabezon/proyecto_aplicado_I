@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -9,12 +11,14 @@ from dotenv import load_dotenv
 
 from project_config import cfg
 
+logger = logging.getLogger(__name__)
+
 
 def _load_env_from_root() -> None:
     """
     Load environment variables from a .env file located at project root.
 
-    This is useful because Streamlit may change the working directory.
+    Streamlit may change the working directory; use an absolute path to avoid missing vars.
     """
     root = Path(__file__).resolve().parents[1]
     env_path = root / ".env"
@@ -84,6 +88,7 @@ def llm_prompt(
 
     preferred_provider = (getattr(cfg, "HF_PROVIDER", "auto") or "auto").strip()
     max_tokens = int(getattr(cfg, "LLM_MAX_TOKENS", 900))
+    timeout_s = float(getattr(cfg, "HF_TIMEOUT_SECONDS", 120.0))
 
     providers_to_try = [preferred_provider]
     if preferred_provider.lower() != "auto":
@@ -92,8 +97,9 @@ def llm_prompt(
     last_error: Optional[Exception] = None
 
     for provider in providers_to_try:
+        t0 = time.perf_counter()
         try:
-            client = InferenceClient(provider=provider, token=token)
+            client = InferenceClient(provider=provider, token=token, timeout=timeout_s)
 
             kwargs: Dict[str, Any] = {}
             if response_format is not None:
@@ -106,11 +112,29 @@ def llm_prompt(
                 max_tokens=max_tokens,
                 **kwargs,
             )
+
             content = completion.choices[0].message.content
-            return (content or "").strip()
+            out = (content or "").strip()
+            dt = time.perf_counter() - t0
+            logger.info(
+                "LLM call completed | provider=%s | model=%s | seconds=%.2f | chars=%d",
+                provider,
+                model,
+                dt,
+                len(out),
+            )
+            return out
 
         except HfHubHTTPError as exc:
             last_error = exc
+            dt = time.perf_counter() - t0
+            logger.warning(
+                "LLM call failed | provider=%s | model=%s | seconds=%.2f | error=%s",
+                provider,
+                model,
+                dt,
+                str(exc),
+            )
             message = str(exc)
             if "404" in message or "Not Found" in message:
                 continue
@@ -118,6 +142,14 @@ def llm_prompt(
 
         except Exception as exc:  # noqa: BLE001
             last_error = exc
+            dt = time.perf_counter() - t0
+            logger.warning(
+                "LLM call failed | provider=%s | model=%s | seconds=%.2f | error=%s",
+                provider,
+                model,
+                dt,
+                str(exc),
+            )
             continue
 
     raise ValueError(

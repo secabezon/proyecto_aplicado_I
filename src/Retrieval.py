@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
@@ -9,6 +9,63 @@ from qdrant_client.http import models
 
 from LLM_prompt import llm_prompt, safe_json_loads
 from project_config import cfg
+
+
+_STORE_CACHE: Dict[int, QdrantVectorStore] = {}
+_STORE_CACHE_KEY: Dict[int, str] = {}
+
+
+def _build_store(client: QdrantClient) -> QdrantVectorStore:
+    """
+    Build a QdrantVectorStore for hybrid retrieval.
+
+    Args:
+        client: Qdrant client.
+
+    Returns:
+        A configured QdrantVectorStore instance.
+    """
+    collection_name = getattr(cfg, "COLLECTION_NAME", "food_science_papers_v1")
+    dense_name = getattr(cfg, "DENSE_VECTOR_NAME", "dense")
+    sparse_name = getattr(cfg, "SPARSE_VECTOR_NAME", "sparse")
+    sparse_model = getattr(cfg, "SPARSE_MODEL_NAME", "Qdrant/bm25")
+
+    embedding_model = HuggingFaceEmbeddings(
+        model_name=getattr(cfg, "EMBEDDING_MODEL", "thenlper/gte-small")
+    )
+    sparse_embeddings = FastEmbedSparse(model_name=sparse_model)
+
+    return QdrantVectorStore(
+        client=client,
+        collection_name=collection_name,
+        embedding=embedding_model,
+        sparse_embedding=sparse_embeddings,
+        retrieval_mode=RetrievalMode.HYBRID,
+        vector_name=dense_name,
+        sparse_vector_name=sparse_name,
+    )
+
+
+def _get_store(client: QdrantClient) -> QdrantVectorStore:
+    """
+    Get a cached vector store for a given client.
+
+    Args:
+        client: Qdrant client.
+
+    Returns:
+        Cached QdrantVectorStore.
+    """
+    client_key = id(client)
+    collection_name = getattr(cfg, "COLLECTION_NAME", "food_science_papers_v1")
+
+    if client_key in _STORE_CACHE and _STORE_CACHE_KEY.get(client_key) == collection_name:
+        return _STORE_CACHE[client_key]
+
+    store = _build_store(client)
+    _STORE_CACHE[client_key] = store
+    _STORE_CACHE_KEY[client_key] = collection_name
+    return store
 
 
 def extract_query_filters(query: str) -> Tuple[Optional[str], Optional[str]]:
@@ -59,38 +116,16 @@ def retrieve(
     Returns:
         A list of LangChain Document objects (deduplicated by chunk_id).
     """
-    collection_name = getattr(cfg, "COLLECTION_NAME", "food_science_papers_v1")
-    dense_name = getattr(cfg, "DENSE_VECTOR_NAME", "dense")
-    sparse_name = getattr(cfg, "SPARSE_VECTOR_NAME", "sparse")
-    sparse_model = getattr(cfg, "SPARSE_MODEL_NAME", "Qdrant/bm25")
-
-    embedding_model = HuggingFaceEmbeddings(
-        model_name=getattr(cfg, "EMBEDDING_MODEL", "thenlper/gte-small")
-    )
-    sparse_embeddings = FastEmbedSparse(model_name=sparse_model)
-
-    store = QdrantVectorStore(
-        client=client,
-        collection_name=collection_name,
-        embedding=embedding_model,
-        sparse_embedding=sparse_embeddings,
-        retrieval_mode=RetrievalMode.HYBRID,
-        vector_name=dense_name,
-        sparse_vector_name=sparse_name,
-    )
+    store = _get_store(client)
 
     k_val = int(k or getattr(cfg, "RETRIEVE_TOP_K", 10))
     date_key = getattr(cfg, "PAPER_DATE_KEY", "paper_date")
 
     must: List[models.FieldCondition] = []
     if doc_id:
-        must.append(
-            models.FieldCondition(key="doc_id", match=models.MatchValue(value=doc_id))
-        )
+        must.append(models.FieldCondition(key="doc_id", match=models.MatchValue(value=doc_id)))
     if paper_date:
-        must.append(
-            models.FieldCondition(key=date_key, match=models.MatchValue(value=paper_date))
-        )
+        must.append(models.FieldCondition(key=date_key, match=models.MatchValue(value=paper_date)))
 
     qdrant_filter = models.Filter(must=must) if must else None
     results = store.similarity_search(query=query, k=k_val, filter=qdrant_filter)

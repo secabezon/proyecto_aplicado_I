@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List
+from typing import Callable, List, Optional
 
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
+from loguru import logger
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
 
 from project_config import cfg, project_root
+
+
+ProgressCallback = Callable[[int, int], None]
 
 
 def read_chunk_records(chunks_file: Path) -> List[dict]:
@@ -37,12 +41,13 @@ def read_chunk_records(chunks_file: Path) -> List[dict]:
     return data
 
 
-def vector_store_config(client: QdrantClient) -> None:
+def vector_store_config(client: QdrantClient, progress_callback: Optional[ProgressCallback] = None) -> None:
     """
     Recreate the Qdrant collection and upsert documents for all chunk records.
 
     Args:
         client: Qdrant client.
+        progress_callback: Optional callback invoked as (done, total).
     """
     root = project_root()
     out_dir = root / getattr(cfg, "OUTPUT_DIR", "outputs/ingest")
@@ -106,4 +111,23 @@ def vector_store_config(client: QdrantClient) -> None:
         sparse_vector_name=sparse_name,
     )
 
-    vector_store.add_documents(docs)
+    batch_size = int(getattr(cfg, "UPSERT_BATCH_SIZE", 64))
+    total = len(docs)
+    done = 0
+
+    logger.info(
+        "Upserting documents | collection=%s | total=%d | batch_size=%d",
+        collection_name,
+        total,
+        batch_size,
+    )
+
+    for start in range(0, total, batch_size):
+        end = min(start + batch_size, total)
+        vector_store.add_documents(docs[start:end])
+        done = end
+
+        if progress_callback is not None:
+            progress_callback(done, total)
+
+        logger.info("Upsert progress | done=%d | total=%d", done, total)

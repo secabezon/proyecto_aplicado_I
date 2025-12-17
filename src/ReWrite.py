@@ -21,8 +21,28 @@ def decompose_query(query: str) -> List[str]:
     temperature = float(getattr(cfg, "LLM_TEMPERATURE", 0.0))
     out = llm_prompt(messages, temperature=temperature)
 
-    subqueries = [line.strip() for line in (out or "").splitlines() if line.strip()]
-    return subqueries if subqueries else [query]
+    raw_lines = [line.strip() for line in (out or "").splitlines() if line.strip()]
+
+    max_subqueries = int(getattr(cfg, "MAX_SUBQUERIES", 3))
+    min_subqueries = int(getattr(cfg, "MIN_SUBQUERIES", 1))
+
+    cleaned: List[str] = []
+    seen = set()
+    for line in raw_lines:
+        if len(line) > 200:
+            continue
+        if line in seen:
+            continue
+        seen.add(line)
+        cleaned.append(line)
+
+    if not cleaned:
+        return [query]
+
+    if len(cleaned) < min_subqueries:
+        return [query]
+
+    return cleaned[:max_subqueries]
 
 
 def generate_hyde_document(query: str) -> str:

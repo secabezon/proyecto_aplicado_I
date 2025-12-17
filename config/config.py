@@ -1,11 +1,17 @@
 # config/config.py
+
 from __future__ import annotations
 
+"""
+Configuration for an English-corpus RAG system (food science papers):
+- All retrieval-side processing (filters, query decomposition, HyDE, repack) runs in ENGLISH.
+- Final answer is generated in SPANISH, grounded strictly on English evidence.
+"""
 
 INPUT_DIR = "data/raw"
 OUTPUT_DIR = "outputs/ingest"
 BASE_OUTPUT_NAME = "corpus_chunks"
-WORDS_PER_CHUNK = 120
+WORDS_PER_CHUNK = 100
 OVERLAP = 40
 LOG_LEVEL = "INFO"
 
@@ -16,17 +22,20 @@ DENSE_VECTOR_NAME = "dense"
 SPARSE_VECTOR_NAME = "sparse"
 SPARSE_MODEL_NAME = "Qdrant/bm25"
 
+# English-first retrieval stack (query + corpus in English)
 EMBEDDING_MODEL = "thenlper/gte-small"
 CROSSENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
-RETRIEVE_TOP_K = 10
-RERANK_TOP_K = 5
-MAX_EVIDENCE_ITEMS = 10
+
+RETRIEVE_TOP_K = 50
+RERANK_TOP_K = 2
+MAX_EVIDENCE_ITEMS = 8
 
 PAPER_DATE_KEY = "paper_date"
 PAPER_TITLE_KEY = "paper_title"
 PAPER_META_PAGES = 2
 PAPER_META_MAX_CHARS = 9000
+
 
 HF_TOKEN = ""
 HF_PROVIDER = "auto"
@@ -36,104 +45,108 @@ LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS = 900
 
 PROMPT_QUERY_FILTERS = """\
-Eres un sistema de extracción estricta.
+You are a strict information extraction system.
 
-A partir de la consulta del usuario, extrae filtros opcionales:
-- doc_id: el identificador del documento si el usuario menciona un PDF específico (por ejemplo el nombre del archivo sin extensión).
-- paper_date: un año o fecha si el usuario la menciona explícitamente.
+From the user's query, extract optional filters:
+- doc_id: the document identifier if the user mentions a specific PDF (e.g., the filename without extension).
+- paper_date: a year or date if explicitly mentioned.
 
-Reglas:
-- Usa null cuando no exista información explícita.
-- Responde solo con JSON válido, sin texto adicional.
-- Formato exacto:
+Rules:
+- Use null when the information is not explicitly present.
+- Output ONLY valid JSON, with no extra text.
+- Exact format:
 {{"doc_id": <string|null>, "paper_date": <string|null>}}
 
-Consulta:
+User query:
 {query}
 """
 
 PROMPT_PAPER_METADATA = """\
-Eres un sistema de extracción estricta de metadatos de papers académicos.
+You are a strict metadata extraction system for academic papers.
 
-A partir del texto, extrae:
-- paper_title: título principal del paper
-- paper_date: año (preferido) o fecha completa, solo si aparece explícitamente
+From the text, extract:
+- paper_title: the main title of the paper
+- paper_date: year (preferred) or full date, only if explicitly present
 
-Reglas:
-- No inventes.
-- Si no está presente, usa null.
-- Responde solo con JSON válido y sin texto adicional.
-- Formato exacto:
+Rules:
+- Do NOT guess or hallucinate.
+- If missing, use null.
+- Output ONLY valid JSON, with no extra text.
+- Exact format:
 {{"paper_title": <string|null>, "paper_date": <string|null>}}
 
-Texto:
+Text:
 {text}
 """
 
 PROMPT_QUERY_DECOMPOSITION = """\
-Eres un reescritor experto de consultas para un sistema RAG sobre papers de ciencia y tecnología de alimentos.
+You are an expert query rewriter for a RAG system over food science & technology papers.
 
-Genera entre 3 y 6 sub-consultas cortas para recuperar evidencia.
+Generate 3 to 6 SHORT English sub-queries to retrieve evidence.
 
-Reglas:
-- Máximo 20 palabras por línea.
-- Prioriza términos técnicos de ciencia de alimentos.
-- No agregues hechos externos.
-- Devuelve una sub-consulta por línea, sin numeración y sin texto adicional.
+Rules:
+- Output in ENGLISH only.
+- Max 20 words per line.
+- Prefer food science technical terms.
+- Do NOT add external facts.
+- Return one sub-query per line, no numbering, no extra text.
 
-Consulta:
+User query:
 {query}
 """
 
 PROMPT_HYDE = """\
-Redacta un párrafo breve (máximo 120 palabras) que sería una respuesta ideal a la consulta del usuario.
-Este texto se usará solo para recuperación de documentos.
+Write a brief paragraph (max 120 words) that would be an ideal answer to the user's query.
+This text will be used ONLY for document retrieval (HyDE).
 
-Reglas:
-- Un solo párrafo.
-- No menciones que es hipotético.
-- Usa vocabulario técnico de ciencia de alimentos.
-- No inventes datos concretos si no están en la consulta.
+Rules:
+- Output in ENGLISH only.
+- One paragraph only.
+- Do NOT mention it is hypothetical.
+- Use food science technical vocabulary.
+- Do NOT invent concrete data not present in the query.
 
-Consulta:
+User query:
 {query}
 """
 
 PROMPT_REPACK = """\
-Eres un asistente de extracción literal de evidencia desde papers.
+You are a literal evidence extractor for academic papers.
 
-Objetivo: extraer fragmentos textuales exactos del documento que sean directamente relevantes para la consulta.
+Goal: extract exact textual fragments from the document that are directly relevant to the query.
 
-Reglas:
-- Copia literalmente, sin parafrasear.
-- Incluye solo fragmentos útiles para responder.
-- Si no hay nada relevante, responde exactamente: NO_RELEVANT_CONTENT
-- No agregues texto fuera de los fragmentos extraídos.
+Rules:
+- Copy text verbatim (no paraphrasing).
+- Include only fragments that help answer the query.
+- If nothing relevant is found, respond exactly: NO_RELEVANT_CONTENT
+- Do NOT add any text outside the extracted fragments.
 
-Consulta:
+User query:
 {query}
 
-Documento:
+Document:
 {doc}
 
-Extracciones relevantes:
+Relevant extractions:
 """
 
 PROMPT_FINAL_ANSWER = """\
-Responde a la pregunta del usuario usando exclusivamente la evidencia provista.
+Responde la pregunta del usuario usando exclusivamente la evidencia provista.
 No menciones modelos, proveedores, tokens ni detalles de implementación.
 
 Reglas:
 - No uses conocimiento externo.
 - No inventes.
 - Cuando recomiendes papers, incluye siempre paper_date y paper_title.
+- No traduzcas ni alteres paper_title; mantenlo exactamente como aparece en la evidencia.
+- No traduzcas ni reescribas la evidencia; cítala solo mediante [E1], [E2], etc.
 - Cita evidencia con [E1], [E2], etc.
 - Escribe en español, técnico y claro.
 
-Pregunta del usuario:
+Pregunta del usuario (EN):
 {query}
 
-Evidencia:
+Evidencia (EN):
 {evidence}
 
 Formato:
