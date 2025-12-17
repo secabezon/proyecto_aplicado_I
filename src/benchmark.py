@@ -1,57 +1,68 @@
-# benchmark.py
-from pathlib import Path
+from __future__ import annotations
+
 import json
+from pathlib import Path
 from statistics import mean
+from typing import Any, Dict, List
+
 from Retrieval import retrieve
 
 EVAL_PATH = Path("data/processed/eval_set.json")
 
-DEFAULT_EVAL_SET = [
-    {
-        "query": "m/z 449.107 actividad antidiabética",
-        "relevant_doc_ids": ["myricetin_paper_1"]
-    }
+DEFAULT_EVAL_SET: List[Dict[str, Any]] = [
+    {"query": "m/z 449.107 actividad antidiabética", "relevant_doc_ids": ["myricetin_paper_1"]}
 ]
 
 
-def load_eval_set(path: Path = EVAL_PATH):
-    if not path.exists():
-        print(f"[WARN] {path} no encontrado. Usando DEFAULT_EVAL_SET.")
-        return DEFAULT_EVAL_SET
+def load_eval_set() -> List[Dict[str, Any]]:
+    """
+    Load an evaluation set from disk, or return a default set.
 
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    Returns:
+        A list of evaluation items with keys: query, relevant_doc_ids.
+    """
+    if EVAL_PATH.is_file():
+        return json.loads(EVAL_PATH.read_text(encoding="utf-8"))
+    return DEFAULT_EVAL_SET
 
 
-def eval_metrics_at_k(client, k: int = 5, eval_set=None):
-    if eval_set is None:
-        eval_set = load_eval_set()
+def eval_metrics_at_k(client: Any, k: int = 5) -> Dict[str, Any]:
+    """
+    Compute macro Precision@k and Recall@k over an evaluation set.
 
-    per_query_results = []
+    Args:
+        client: Qdrant client.
+        k: Retrieval depth.
+
+    Returns:
+        Dictionary with precision_at_k, recall_at_k, and per_query breakdown.
+    """
+    eval_set = load_eval_set()
+    per_query_results: List[Dict[str, Any]] = []
 
     for item in eval_set:
         query = item["query"]
-        relevant_ids = set(item["relevant_doc_ids"])
+        relevant_ids = set(item.get("relevant_doc_ids", []))
 
         docs = retrieve(client, query, k=k)
-        retrieved_ids = [d.metadata["doc_id"] for d in docs]
+        retrieved_ids = [d.metadata.get("doc_id") for d in docs if d.metadata.get("doc_id")]
 
-        retrieved_set = set(retrieved_ids)
-        hits = len(relevant_ids & retrieved_set)
+        hits = sum(1 for rid in retrieved_ids if rid in relevant_ids)
+        precision = hits / max(len(retrieved_ids), 1)
+        recall = hits / max(len(relevant_ids), 1)
 
-        precision = hits / len(retrieved_ids) if retrieved_ids else 0.0
-        recall = hits / len(relevant_ids) if relevant_ids else 0.0
-
-        per_query_results.append({
-            "query": query,
-            "relevant_doc_ids": list(relevant_ids),
-            "retrieved_doc_ids": retrieved_ids,
-            "num_relevant": len(relevant_ids),
-            "num_retrieved": len(retrieved_ids),
-            "num_hits": hits,
-            "precision": precision,
-            "recall": recall,
-        })
+        per_query_results.append(
+            {
+                "query": query,
+                "retrieved_doc_ids": retrieved_ids,
+                "relevant_doc_ids": list(relevant_ids),
+                "num_relevant": len(relevant_ids),
+                "num_retrieved": len(retrieved_ids),
+                "num_hits": hits,
+                "precision": precision,
+                "recall": recall,
+            }
+        )
 
     macro_precision = mean(r["precision"] for r in per_query_results)
     macro_recall = mean(r["recall"] for r in per_query_results)

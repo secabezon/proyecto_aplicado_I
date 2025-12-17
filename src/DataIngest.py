@@ -1,464 +1,254 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
-"""
-Convert all PDF scientific papers in a directory into a JSON file of text
-chunks that follow a minimal ingestion → retrieval contract.
-
-Contract per chunk
-------------------
-- chunk_id : str  (e.g., "paper_0001_chunk_0000")
-- doc_id   : str  (derived from each PDF filename)
-- order    : int  (0-based index of the chunk within that document)
-- text     : str  (chunk content)
-
-Chunking strategy
------------------
-- Text is cleaned to:
-  * normalize common Unicode ligatures (e.g., "ﬀ" → "ff"),
-  * join words split across lines with a hyphen
-    (e.g., "for-\\n mulation" → "formulation"),
-  * collapse multiple whitespace characters into a single space.
-- Text is then split into word-based chunks with overlap:
-  * default words_per_chunk = 100,
-  * default overlap = 50 (50% overlap).
-
-Usage
------
-python pdf_to_chunks.py
-python pdf_to_chunks.py --input-dir data --output-dir outputs
-"""
-
-import argparse
 import json
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
 from PyPDF2 import PdfReader
 
-from config import config as cfg
+from LLM_prompt import llm_prompt, safe_json_loads
+from project_config import cfg, project_root
 
 
-def configure_logging(log_level: str) -> None:
+def clean_text(text: str) -> str:
     """
-    Configure basic logging with loguru.
+    Normalize extracted text by collapsing whitespace.
 
-    This function removes existing handlers and adds a simple stderr
-    sink with timestamp, level, and message.
+    Args:
+        text: Raw text.
 
-    Parameters
-    ----------
-    log_level : str
-        Logging level to use (e.g., "INFO", "DEBUG").
-    """
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        format=(
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-            "<level>{level: <8}</level> | "
-            "<cyan>{message}</cyan>"
-        ),
-        level=log_level.upper(),
-    )
-
-
-def extract_text_from_pdf(pdf_path: Path) -> str:
-    """
-    Extract plain text from all pages of a PDF file.
-
-    Parameters
-    ----------
-    pdf_path : Path
-        Path to the input PDF file.
-
-    Returns
-    -------
-    str
-        Concatenated text from all pages.
-    """
-    reader = PdfReader(str(pdf_path))
-    pages_text: List[str] = []
-
-    for page in reader.pages:
-        page_text = page.extract_text() or ""
-        pages_text.append(page_text)
-
-    full_text = "\n\n".join(pages_text)
-    return full_text
-
-
-def clean_extracted_text(text: str) -> str:
-    """
-    Clean raw text extracted from a PDF.
-
-    This function performs light, conservative cleaning so that content
-    is not over-merged:
-
-    - Normalize common Unicode ligatures (e.g., "ﬀ" → "ff").
-    - Join words that were split with a hyphen at the end of a line
-      (e.g., "for-\\n mulation" → "formulation").
-    - Collapse multiple whitespace characters into a single space.
-
-    Parameters
-    ----------
-    text : str
-        Raw text as extracted from the PDF.
-
-    Returns
-    -------
-    str
+    Returns:
         Cleaned text.
     """
-    ligatures = {
-        "\ufb00": "ff",
-        "\ufb01": "fi",
-        "\ufb02": "fl",
-        "\ufb03": "ffi",
-        "\ufb04": "ffl",
-        "\ufb05": "ft",
-        "\ufb06": "st",
-    }
-    for bad, good in ligatures.items():
-        text = text.replace(bad, good)
-
-    # Join hyphenated words across line breaks.
-    text = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", text)
-    # Collapse multiple whitespace characters into a single space.
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", text or "").strip()
 
 
-def chunk_text_with_overlap(
-    text: str,
-    words_per_chunk: int = 100,
-    overlap: int = 50,
-) -> List[str]:
+def chunk_words(words: List[str], words_per_chunk: int, overlap: int) -> List[str]:
     """
-    Split a long text into consecutive word-based chunks with overlap.
+    Chunk a list of words using a fixed window size and overlap.
 
-    Parameters
-    ----------
-    text : str
-        Full document text to be chunked.
-    words_per_chunk : int, optional
-        Target number of words per chunk, by default 100.
-    overlap : int, optional
-        Number of words shared between consecutive chunks, by
-        default 50 (i.e., 50% overlap for 100-word chunks).
+    Args:
+        words: Tokenized words.
+        words_per_chunk: Chunk size in words.
+        overlap: Overlap size in words.
 
-    Returns
-    -------
-    List[str]
-        List of chunk texts. Each chunk has up to `words_per_chunk`
-        words, and consecutive chunks share `overlap` words.
+    Returns:
+        A list of chunk strings.
+
+    Raises:
+        ValueError: If parameters are invalid.
     """
     if words_per_chunk <= 0:
-        raise ValueError("words_per_chunk must be positive.")
+        raise ValueError("words_per_chunk must be > 0")
+    if overlap < 0 or overlap >= words_per_chunk:
+        raise ValueError("overlap must be >= 0 and < words_per_chunk")
 
-    if not (0 <= overlap < words_per_chunk):
-        raise ValueError("overlap must be in [0, words_per_chunk).")
-
-    words = text.split()
     chunks: List[str] = []
-    stride = words_per_chunk - overlap
-
-    for start in range(0, len(words), stride):
+    step = words_per_chunk - overlap
+    for start in range(0, len(words), step):
         end = start + words_per_chunk
-        chunk_words = words[start:end]
-        if not chunk_words:
+        chunk = " ".join(words[start:end]).strip()
+        if chunk:
+            chunks.append(chunk)
+        if end >= len(words):
             break
-        chunk_text = " ".join(chunk_words).strip()
-        if chunk_text:
-            chunks.append(chunk_text)
-
     return chunks
 
 
-def build_chunk_records(doc_id: str, chunks: List[str]) -> List[Dict[str, object]]:
+def pdf_pages_to_text(pdf_path: Path, max_pages: Optional[int] = None) -> str:
     """
-    Build a list of chunk records that follow the minimal contract.
+    Extract text from a PDF file.
 
-    Parameters
-    ----------
-    doc_id : str
-        Identifier for the document, usually derived from the filename.
-    chunks : List[str]
-        List of chunk texts.
+    Args:
+        pdf_path: Path to the PDF.
+        max_pages: Optional max number of pages to extract from the start.
 
-    Returns
-    -------
-    List[Dict[str, object]]
-        List of dictionaries, each representing one chunk:
-        {
-            "chunk_id": str,
-            "doc_id": str,
-            "order": int,
-            "text": str,
-        }
+    Returns:
+        Extracted text.
     """
-    records: List[Dict[str, object]] = []
+    reader = PdfReader(str(pdf_path))
+    n_pages = len(reader.pages)
+    limit = min(n_pages, max_pages) if max_pages else n_pages
+    parts: List[str] = []
 
-    for idx, text in enumerate(chunks):
-        chunk_id = f"{doc_id}_chunk_{idx:04d}"
-        record: Dict[str, object] = {
-            "chunk_id": chunk_id,
-            "doc_id": doc_id,
-            "order": idx,
-            "text": text,
-        }
-        records.append(record)
+    for i in range(limit):
+        parts.append(reader.pages[i].extract_text() or "")
 
-    return records
+    return "\n".join(parts)
 
 
-def run_pdf_chunker(
-    input_dir: Path,
-    output_dir: Path,
-    base_output_name: str,
-    words_per_chunk: int,
-    overlap: int,
-    log_level: str,
-) -> None:
+def heuristic_year(text: str) -> Optional[str]:
     """
-    Run the end-to-end pipeline to convert PDFs into chunk records.
+    Detect a plausible publication year in text.
 
-    This function:
-    - enumerates and validates PDF files in the input directory,
-    - extracts and cleans text from each file,
-    - chunks the text with overlap,
-    - writes a JSON file with all chunk records, and
-    - writes a separate metadata JSON file describing the run
-      (parameters, timestamps, and counts).
+    Args:
+        text: Text to scan.
 
-    Parameters
-    ----------
-    input_dir : Path
-        Directory containing PDF files.
-    output_dir : Path
-        Directory where the output JSON files will be saved.
-    base_output_name : str
-        Base name for output files; a timestamp will be appended.
-    words_per_chunk : int
-        Number of words per chunk.
-    overlap : int
-        Number of overlapping words between consecutive chunks.
-    log_level : str
-        Logging level used during the run.
+    Returns:
+        A 4-digit year if found, otherwise None.
     """
-    if not input_dir.is_dir():
-        raise ValueError(f"Input directory does not exist: {input_dir}")
+    matches = re.findall(r"\b(19\d{2}|20\d{2})\b", text or "")
+    return matches[0] if matches else None
 
-    # Ensure that the output directory exists.
-    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Collect PDF files to be processed.
-    pdf_files = sorted(
-        path for path in input_dir.iterdir() if path.suffix.lower() == ".pdf"
-    )
-    num_pdfs = len(pdf_files)
+def extract_paper_metadata(pdf_path: Path) -> Tuple[str, str]:
+    """
+    Extract (paper_date, paper_title) using an LLM with a heuristic fallback.
 
-    # Timestamp used both in metadata and in the output filenames.
-    run_datetime = datetime.now()
-    timestamp_label = run_datetime.strftime("%Y%m%d_%H%M%S")
+    Args:
+        pdf_path: PDF path.
 
-    base_name = f"{base_output_name}_{timestamp_label}"
-    output_path = output_dir / f"{base_name}.json"
-    metadata_path = output_dir / f"{base_name}_metadata.json"
+    Returns:
+        (paper_date, paper_title)
+    """
+    pages = int(getattr(cfg, "PAPER_META_PAGES", 2))
+    max_chars = int(getattr(cfg, "PAPER_META_MAX_CHARS", 9000))
 
+    raw_head = pdf_pages_to_text(pdf_path, max_pages=pages)
+    head = clean_text(raw_head)[:max_chars]
+
+    prompt = getattr(cfg, "PROMPT_PAPER_METADATA").format(text=head)
+    messages = [{"role": "user", "content": prompt}]
+
+    paper_date = "UNKNOWN"
+    paper_title = "UNKNOWN"
+
+    try:
+        out = llm_prompt(messages, temperature=float(getattr(cfg, "LLM_TEMPERATURE", 0.0)))
+        data = safe_json_loads(out)
+        paper_title_val = data.get("paper_title")
+        paper_date_val = data.get("paper_date")
+
+        if isinstance(paper_title_val, str) and paper_title_val.strip():
+            paper_title = paper_title_val.strip()
+
+        if isinstance(paper_date_val, str) and paper_date_val.strip():
+            paper_date = paper_date_val.strip()
+
+    except Exception:
+        pass
+
+    if paper_date == "UNKNOWN":
+        guess_year = heuristic_year(head)
+        if guess_year:
+            paper_date = guess_year
+
+    if paper_title == "UNKNOWN":
+        paper_title = pdf_path.stem.replace("_", " ").strip() or "UNKNOWN"
+
+    return paper_date, paper_title
+
+
+def build_output_paths() -> Tuple[Path, Path]:
+    """
+    Build deterministic output paths.
+
+    Returns:
+        (chunks_json_path, metadata_json_path)
+    """
+    root = project_root()
+    out_dir = root / getattr(cfg, "OUTPUT_DIR", "outputs/ingest")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    base = getattr(cfg, "BASE_OUTPUT_NAME", "corpus_chunks")
+    chunks_path = out_dir / f"{base}.json"
+    meta_path = out_dir / f"{base}_metadata.json"
+    return chunks_path, meta_path
+
+
+def main() -> Dict[str, str]:
+    """
+    Ingest all PDFs from cfg.INPUT_DIR and write a single JSON list of chunk records.
+
+    Each chunk record includes:
+        doc_id, chunk_id, order, text, paper_date, paper_title
+
+    Returns:
+        Paths of generated files.
+    """
+    root = project_root()
+    input_dir = root / getattr(cfg, "INPUT_DIR", "data/raw")
+    words_per_chunk = int(getattr(cfg, "WORDS_PER_CHUNK", 120))
+    overlap = int(getattr(cfg, "OVERLAP", 40))
+
+    date_key = getattr(cfg, "PAPER_DATE_KEY", "paper_date")
+    title_key = getattr(cfg, "PAPER_TITLE_KEY", "paper_title")
+
+    chunks_file, metadata_file = build_output_paths()
+
+    pdf_paths = sorted(input_dir.rglob("*.pdf"))
     logger.info(
-        (
-            "Starting PDF to chunks conversion | input_dir='{}' | "
-            "output_dir='{}' | output_file='{}' | words_per_chunk={} | "
-            "overlap={} | log_level='{}' | n_pdfs={}"
-        ),
-        input_dir,
-        output_dir,
-        output_path.name,
-        words_per_chunk,
-        overlap,
-        log_level.upper(),
-        num_pdfs,
+        "Starting PDF to chunks conversion | input_dir='{}' | output_file='{}' | n_pdfs={}",
+        str(input_dir),
+        str(chunks_file),
+        len(pdf_paths),
     )
 
     all_records: List[Dict[str, object]] = []
-    total_chunks = 0
+    per_doc_stats: List[Dict[str, object]] = []
 
-    if num_pdfs == 0:
-        logger.warning(
-            "No PDF files found in directory '{}'. An empty output will be written.",
-            input_dir,
+    for idx, pdf_path in enumerate(pdf_paths, start=1):
+        logger.info("Processing file {}/{}: {}", idx, len(pdf_paths), pdf_path.name)
+
+        doc_id = pdf_path.stem
+        paper_date, paper_title = extract_paper_metadata(pdf_path)
+
+        raw_text = pdf_pages_to_text(pdf_path, max_pages=None)
+        cleaned = clean_text(raw_text)
+
+        words = cleaned.split()
+        chunks = chunk_words(words, words_per_chunk=words_per_chunk, overlap=overlap)
+
+        for order, chunk_text in enumerate(chunks):
+            all_records.append(
+                {
+                    "chunk_id": f"{doc_id}_chunk_{order:04d}",
+                    "doc_id": doc_id,
+                    "order": order,
+                    "text": chunk_text,
+                    date_key: paper_date,
+                    title_key: paper_title,
+                }
+            )
+
+        per_doc_stats.append(
+            {
+                "doc_id": doc_id,
+                "pdf_file": str(pdf_path),
+                "num_chars_clean": len(cleaned),
+                "num_chunks": len(chunks),
+                date_key: paper_date,
+                title_key: paper_title,
+            }
         )
-    else:
-        for index, pdf_path in enumerate(pdf_files, start=1):
-            logger.info(
-                "Processing file {}/{}: {}",
-                index,
-                num_pdfs,
-                pdf_path.name,
-            )
 
-            doc_id = pdf_path.stem
-            raw_text = extract_text_from_pdf(pdf_path)
-            full_text = clean_extracted_text(raw_text)
-            chunks = chunk_text_with_overlap(
-                full_text,
-                words_per_chunk=words_per_chunk,
-                overlap=overlap,
-            )
+    chunks_file.write_text(
+        json.dumps(all_records, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
-            logger.info(
-                "Document '{}' cleaned length: {} characters, produced {} chunks.",
-                doc_id,
-                len(full_text),
-                len(chunks),
-            )
-
-            records = build_chunk_records(doc_id, chunks)
-
-            for record in records:
-                all_records.append(record)
-                total_chunks += 1
-
-                # Progress log every 50 chunks.
-                if total_chunks % 50 == 0:
-                    logger.info(
-                        (
-                            "Progress: {} chunks processed so far. "
-                            "Last chunk_id='{}'."
-                        ),
-                        total_chunks,
-                        record["chunk_id"],
-                    )
-
-    # Write the chunk records to the main JSON file.
-    with output_path.open("w", encoding="utf-8") as file:
-        json.dump(all_records, file, ensure_ascii=False, indent=2)
-
-    # Build and write metadata with parameters and run information.
-    metadata: Dict[str, object] = {
-        "run_datetime": run_datetime.isoformat(),
-        "timestamp_label": timestamp_label,
-        "parameters": {
-            "input_dir": str(input_dir.resolve()),
-            "output_dir": str(output_dir.resolve()),
-            "base_output_name": base_output_name,
-            "words_per_chunk": words_per_chunk,
-            "overlap": overlap,
-            "log_level": log_level.upper(),
-        },
-        "output_file": output_path.name,
-        "metadata_file": metadata_path.name,
-        "n_pdfs": num_pdfs,
-        "total_chunks": total_chunks,
-        "pdf_filenames": [path.name for path in pdf_files],
+    metadata = {
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "input_dir": str(input_dir),
+        "num_pdfs": len(pdf_paths),
+        "words_per_chunk": words_per_chunk,
+        "overlap": overlap,
+        "num_total_chunks": len(all_records),
+        "per_doc_stats": per_doc_stats,
     }
-
-    with metadata_path.open("w", encoding="utf-8") as file:
-        json.dump(metadata, file, ensure_ascii=False, indent=2)
+    metadata_file.write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     logger.success(
         "Finished writing {} chunk records to '{}' and metadata to '{}'.",
-        total_chunks,
-        output_path,
-        metadata_path.name,
+        len(all_records),
+        str(chunks_file),
+        str(metadata_file),
     )
 
-
-def parse_args() -> argparse.Namespace:
-    """
-    Parse command-line arguments and return an argparse namespace.
-
-    Command-line arguments override the default values defined in
-    config/config.py.
-    """
-    parser = argparse.ArgumentParser(
-        description=(
-            "Convert all PDFs in a directory into JSON chunks following "
-            "the minimal contract (with basic cleaning and overlapping chunks)."
-        )
-    )
-    parser.add_argument(
-        "--input-dir",
-        type=str,
-        default=cfg.INPUT_DIR,
-        help=(
-            "Path to the directory containing PDF files "
-            f"(default: '{cfg.INPUT_DIR}')."
-        ),
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default=cfg.OUTPUT_DIR,
-        help=(
-            "Path to the directory where JSON outputs will be written "
-            f"(default: '{cfg.OUTPUT_DIR}')."
-        ),
-    )
-    parser.add_argument(
-        "--base-output-name",
-        type=str,
-        default=cfg.BASE_OUTPUT_NAME,
-        help=(
-            "Base name for the output files. A timestamp will be appended "
-            f"(default: '{cfg.BASE_OUTPUT_NAME}')."
-        ),
-    )
-    parser.add_argument(
-        "--words-per-chunk",
-        type=int,
-        default=cfg.WORDS_PER_CHUNK,
-        help=(
-            "Number of words per chunk "
-            f"(default: {cfg.WORDS_PER_CHUNK})."
-        ),
-    )
-    parser.add_argument(
-        "--overlap",
-        type=int,
-        default=cfg.OVERLAP,
-        help=(
-            "Number of overlapping words between chunks "
-            f"(default: {cfg.OVERLAP})."
-        ),
-    )
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default=cfg.LOG_LEVEL,
-        help=(
-            "Logging level, e.g. 'INFO' or 'DEBUG' "
-            f"(default: '{cfg.LOG_LEVEL}')."
-        ),
-    )
-
-    return parser.parse_args()
-
-
-def main() -> None:
-    """
-    Entry point for command-line execution.
-
-    This function configures logging, resolves the effective parameters
-    (defaults plus CLI overrides), and runs the PDF chunker pipeline.
-    """
-    args = parse_args()
-    configure_logging(args.log_level)
-
-    run_pdf_chunker(
-        input_dir=Path(args.input_dir),
-        output_dir=Path(args.output_dir),
-        base_output_name=args.base_output_name,
-        words_per_chunk=args.words_per_chunk,
-        overlap=args.overlap,
-        log_level=args.log_level,
-    )
-
-
-if __name__ == "__main__":
-    main()
+    return {"chunks_file": str(chunks_file), "metadata_file": str(metadata_file)}
