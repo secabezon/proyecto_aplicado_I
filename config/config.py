@@ -30,7 +30,7 @@ PAPER_META_MAX_CHARS = 9000
 
 HF_TOKEN = ""
 HF_PROVIDER = "auto"
-HF_CHAT_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
+HF_CHAT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 
 LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS = 900

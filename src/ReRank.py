@@ -35,6 +35,7 @@ def rerank(query: str, chunks: List[Document]) -> List[Dict[str, object]]:
             {
                 "doc_id": doc.metadata.get("doc_id"),
                 "chunk_id": doc.metadata.get("chunk_id"),
+                "order": doc.metadata.get("order"),
                 "content": doc.page_content,
                 "score": float(score),
                 "paper_date": doc.metadata.get(date_key, "UNKNOWN"),

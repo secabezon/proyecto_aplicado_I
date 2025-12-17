@@ -6,8 +6,8 @@ from statistics import mean
 from typing import Any, Dict, List
 
 from Retrieval import retrieve
-from ReRank import reRank
-from ReWrite import response_hyde, stepback_query, descomposition_query
+from ReRank import rerank
+from ReWrite import generate_hyde_document, decompose_query
 import math
 from pathlib import Path
 import sys
@@ -50,7 +50,9 @@ def eval_metrics_at_k(client: Any, k: int = 5) -> Dict[str, Any]:
     Args:
         client: Qdrant client.
         k: Retrieval depth.
+    """
 
+    eval_set = load_eval_set()
     per_query_results_naive = []
     per_query_results_processed = []
 
@@ -97,18 +99,11 @@ def eval_metrics_at_k(client: Any, k: int = 5) -> Dict[str, Any]:
 
     
 
-        # descomposition_querys=descomposition_query(query)
-        # for desc_query in descomposition_querys:
-        #     # sq=stepback_query(desc_query)
-            # hyde=response_hyde(desc_query)
-        #     response = retrieve(client, desc_query)
-        #     rerank=reRank(desc_query,response)
-
         response = retrieve(client, query,k=k)
-        rerank=reRank(query,response)
+        reRank=rerank(query,response)
         retrieved_ids_processed = [
                                     f"{d['doc_id']}:{d['order']}"
-                                    for d in rerank
+                                    for d in reRank
                                    ]
 
         retrieved_set_processed = set(retrieved_ids_processed)
