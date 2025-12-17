@@ -1,7 +1,10 @@
-# benchmark.py
-from pathlib import Path
+from __future__ import annotations
+
 import json
+from pathlib import Path
 from statistics import mean
+from typing import Any, Dict, List
+
 from Retrieval import retrieve
 from ReRank import reRank
 from ReWrite import response_hyde, stepback_query, descomposition_query
@@ -28,18 +31,25 @@ DEFAULT_EVAL_SET = [
 ]
 
 
-def load_eval_set(path: Path = EVAL_PATH):
-    if not path.exists():
-        print(f"[WARN] {path} no encontrado. Usando DEFAULT_EVAL_SET.")
-        return DEFAULT_EVAL_SET
+def load_eval_set() -> List[Dict[str, Any]]:
+    """
+    Load an evaluation set from disk, or return a default set.
 
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    Returns:
+        A list of evaluation items with keys: query, relevant_doc_ids.
+    """
+    if EVAL_PATH.is_file():
+        return json.loads(EVAL_PATH.read_text(encoding="utf-8"))
+    return DEFAULT_EVAL_SET
 
 
-def eval_metrics_at_k(client, k: int = 5, eval_set=None):
-    if eval_set is None:
-        eval_set = load_eval_set()
+def eval_metrics_at_k(client: Any, k: int = 5) -> Dict[str, Any]:
+    """
+    Compute macro Precision@k and Recall@k over an evaluation set.
+
+    Args:
+        client: Qdrant client.
+        k: Retrieval depth.
 
     per_query_results_naive = []
     per_query_results_processed = []

@@ -1,65 +1,41 @@
-import json
+from __future__ import annotations
+
+from typing import List
+
 from LLM_prompt import llm_prompt
+from project_config import cfg
 
 
-def response_hyde(query: str
-):
-
-    hyde_prompt = f"""
-    Please write a brief, one-paragraph hypothetical document that perfectly answers 
-    the following question. This document will be used for a vector search.
-
-    Question: {query}
-
-    Hypothetical Document:
+def decompose_query(query: str) -> List[str]:
     """
-    message=[
-            {"role": "user", "content": hyde_prompt}
-        ]
-    hypothetical_document=llm_prompt(message,0)
+    Decompose a user query into multiple sub-queries.
 
+    Args:
+        query: User query.
 
-    return hypothetical_document
-
-def descomposition_query(query: str
-):
-
-    decomposition_prompt = f"""
-    Decompose the following complex user question into a list of 
-    simple, self-contained sub-queries. Return them as a JSON object with a single key "queries".
-
-    Question: {query}
+    Returns:
+        A non-empty list of sub-queries.
     """
-    
-    message=[
-            {"role": "user", "content": decomposition_prompt}
-        ]
-    response_format={"type": "json_object"}
-    response=llm_prompt(message,0,response_format)
-    sub_queries = json.loads(response)["queries"]    
+    prompt = getattr(cfg, "PROMPT_QUERY_DECOMPOSITION").format(query=query)
+    messages = [{"role": "user", "content": prompt}]
+    temperature = float(getattr(cfg, "LLM_TEMPERATURE", 0.0))
+    out = llm_prompt(messages, temperature=temperature)
+
+    subqueries = [line.strip() for line in (out or "").splitlines() if line.strip()]
+    return subqueries if subqueries else [query]
 
 
-    return sub_queries
-
-def stepback_query(query: str
-):
-
-
-    step_back_prompt = f"""
-    You will be given a specific question. Your task is to generate a more general,
-    high-level "step-back question" that helps provide context to answer the original.
-
-    Question: {query}
-
-    Step-back question:
+def generate_hyde_document(query: str) -> str:
     """
+    Generate a HyDE-style synthetic document for retrieval.
 
+    Args:
+        query: Sub-query.
 
-    message=[
-           {"role": "user", "content": step_back_prompt}
-        ]
-    response=llm_prompt(message,0)
-    step_back_query = response.strip()   
-
-
-    return step_back_query
+    Returns:
+        HyDE text.
+    """
+    prompt = getattr(cfg, "PROMPT_HYDE").format(query=query)
+    messages = [{"role": "user", "content": prompt}]
+    temperature = float(getattr(cfg, "LLM_TEMPERATURE", 0.0))
+    return llm_prompt(messages, temperature=temperature).strip()
