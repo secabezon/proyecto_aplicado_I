@@ -95,9 +95,7 @@ def eval_metrics_at_k(client, k: int = 5, eval_set=None):
         #     rerank=reRank(desc_query,response)
 
         response = retrieve(client, query,k=k)
-        print('---------------len response--------------',len(response))
         rerank=reRank(query,response)
-        print(rerank)
         retrieved_ids_processed = [
                                     f"{d['doc_id']}:{d['order']}"
                                     for d in rerank
@@ -125,17 +123,21 @@ def eval_metrics_at_k(client, k: int = 5, eval_set=None):
 
 
     
-    macro_precision_naive = mean(r["position_weighted_precision_at_k"] for r in per_query_results_naive)
+    macro_precision_naive = mean(r["precision"] for r in per_query_results_naive)
+    macro_pwp_naive = mean(r["position_weighted_precision_at_k"] for r in per_query_results_naive)
     macro_recall_naive = mean(r["recall"] for r in per_query_results_naive)
 
-    macro_precision_processed = mean(r["position_weighted_precision_at_k"] for r in per_query_results_processed)
+    macro_precision_processed = mean(r["precision"] for r in per_query_results_processed)
+    macro_pwp_processed = mean(r["position_weighted_precision_at_k"] for r in per_query_results_processed)
     macro_recall_processed = mean(r["recall"] for r in per_query_results_processed)
 
     return {
         "precision_at_k_naive": macro_precision_naive,
+        "pwp_naive": macro_pwp_naive,
         "recall_at_k_naive": macro_recall_naive,
         "per_query_naive": per_query_results_naive,
         "precision_at_k_processed": macro_precision_processed,
+        "pwp_processed": macro_pwp_processed,
         "recall_at_k_processed": macro_recall_processed,
         "per_query_processed": per_query_results_processed,
     }
