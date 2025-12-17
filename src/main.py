@@ -54,6 +54,7 @@ if st.button("Enviar"):
             if repack != 'NO_RELEVANT_CONTENT' or 'NO_RELEVANT_CONTENT' not in repack:
                 context.append(repack)
         desc_querys.append(desc_query)
+        sqs.append(sq)
         hydes.append(hyde)
         responses.append(response)
         reranks.append(rerank)
