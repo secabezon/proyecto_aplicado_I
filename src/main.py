@@ -113,7 +113,7 @@ if st.button("Ejecutar Benchmark"):
             "query": row["query"],
             "retrieved": row["retrieved_doc_ids"],
             "relevant": row["relevant_doc_ids"],
-            "precision": row["precision"],
+            "precision": row["position_weighted_precision_at_k"],
             "recall": row["recall"],
             "hits": row["num_hits"],
             "Position weighted precision": row["position_weighted_precision_at_k"],
