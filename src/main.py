@@ -38,23 +38,38 @@ if st.button("Enviar"):
     st.subheader("Respuesta Recuperada Mejorada:")
     doc_id=extract_self_query(query)
     descomposition_querys=descomposition_query(query)
-    answers=[]
+    desc_querys=[]
+    sqs=[]
+    hydes=[]
+    responses=[]
+    reranks=[]
+    context=[]
     for desc_query in descomposition_querys:
-        hyde=response_hyde(desc_query)
+        sq=stepback_query(desc_query)
+        hyde=response_hyde(sq)
         response = retrieve(client, hyde, doc_id=doc_id)
         rerank=reRank(query,response)
         for i in rerank:
             repack=rePack(query,i['content'])
-            if repack != 'NO_RELEVANT_CONTENT':
-                answers.append(repack)
-    # st.write('------------hyde-----------')
-    # st.write(hyde)
-    # st.write('------------Normal-----------')
-    # st.write(response)
-    # st.write('------------Rerank-----------')
-    # st.write(rerank)
-    # st.write('------------Final-----------')
-    st.write(answers)
+            if repack != 'NO_RELEVANT_CONTENT' or 'NO_RELEVANT_CONTENT' not in repack:
+                context.append(repack)
+        desc_querys.append(desc_query)
+        sqs.append(sq)
+        hydes.append(hyde)
+        responses.append(response)
+        reranks.append(rerank)
+    st.write('------------Query Descompuesta - descomposition_querys -----------')
+    st.write(desc_querys)
+    st.write('------------Pregunta más amplia - stepback query -----------')
+    st.write(sqs)
+    st.write('------------Respuesta LLM - HYDE -----------')
+    st.write(hydes)
+    st.write('------------Respuesta Proceso - Reitrieve -----------')
+    st.write(responses)
+    st.write('------------Orden Relevantes - Rerank-----------')
+    st.write(reranks)
+    st.write('------------Contexto - Repack-----------')
+    st.write(context)
 
 # --------------------------------------------------------------------
 # BENCHMARK
@@ -67,6 +82,7 @@ if st.button("Ejecutar Benchmark"):
 
     st.subheader("Evaluación con RAG Naive")
     st.write(f"**Precision@5 Naive:** {metrics['precision_at_k_naive']:.3f}")
+    st.write(f"**Position weighted precision @5 Naive:** {metrics['pwp_naive']:.3f}")
     st.write(f"**Recall@5 Naive:** {metrics['recall_at_k_naive']:.3f}")
 
     # Detalle por query
@@ -79,6 +95,7 @@ if st.button("Ejecutar Benchmark"):
             "precision": row["precision"],
             "recall": row["recall"],
             "hits": row["num_hits"],
+            "Position weighted precision": row["position_weighted_precision_at_k"],
         })
 
     
@@ -86,6 +103,7 @@ if st.button("Ejecutar Benchmark"):
 
 
     st.write(f"**Precision@5 Processed:** {metrics['precision_at_k_processed']:.3f}")
+    st.write(f"**Position weighted precision @5 Processed:** {metrics['pwp_processed']:.3f}")
     st.write(f"**Recall@5 Processed:** {metrics['recall_at_k_processed']:.3f}")
 
     # Detalle por query
@@ -98,4 +116,5 @@ if st.button("Ejecutar Benchmark"):
             "precision": row["position_weighted_precision_at_k"],
             "recall": row["recall"],
             "hits": row["num_hits"],
+            "Position weighted precision": row["position_weighted_precision_at_k"],
         })
