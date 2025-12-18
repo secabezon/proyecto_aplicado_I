@@ -42,7 +42,6 @@ def rerank(query: str, chunks: List[Document]) -> List[Dict[str, object]]:
         A list of dictionaries with content, score, and metadata.
     """
     top_k = int(getattr(cfg, "RERANK_TOP_K", 5))
-
     date_key = getattr(cfg, "PAPER_DATE_KEY", "paper_date")
     title_key = getattr(cfg, "PAPER_TITLE_KEY", "paper_title")
 
@@ -64,6 +63,5 @@ def rerank(query: str, chunks: List[Document]) -> List[Dict[str, object]]:
                 "paper_title": doc.metadata.get(title_key, "UNKNOWN"),
             }
         )
-
     results.sort(key=lambda x: float(x["score"]), reverse=True)
     return results[:top_k]

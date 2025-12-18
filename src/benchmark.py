@@ -128,6 +128,7 @@ def _run_naive(client: Any, query: str, retrieve_k: int, k_eval: int) -> List[st
         Retrieved ids at evaluation depth.
     """
     docs = retrieve(client, query, k=retrieve_k)
+    print('------docs------',len(docs),'------')
     ids = _docs_to_ids(docs)
     return ids[:k_eval]
 
@@ -225,7 +226,7 @@ def eval_metrics_at_k(client: Any, k_eval: int = 5) -> Dict[str, Any]:
         Metrics dictionary including per-query details.
     """
     eval_set = load_eval_set()
-    retrieve_k = int(getattr(cfg, "RETRIEVE_TOP_K", 50))
+    retrieve_k = int(getattr(cfg, "RETRIEVE_TOP_K", 10))
     # Note: rerank depth is controlled by cfg.RERANK_TOP_K in ReRank.rerank()
 
     per_query_naive: List[Dict[str, Any]] = []

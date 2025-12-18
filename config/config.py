@@ -28,7 +28,7 @@ CROSSENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 RETRIEVE_TOP_K = 50
-RERANK_TOP_K = 2
+RERANK_TOP_K = 10
 MAX_EVIDENCE_ITEMS = 8
 
 PAPER_DATE_KEY = "paper_date"
