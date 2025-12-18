@@ -180,6 +180,8 @@ def _run_processed(client: Any, query: str, retrieve_k: int, k_eval: int) -> Lis
         ####MODULO sin hyde
         hyde_text = subq
 
+
+        ###RETRIEVE
         docs = retrieve(
             client,
             hyde_text,
@@ -198,7 +200,7 @@ def _run_processed(client: Any, query: str, retrieve_k: int, k_eval: int) -> Lis
             if prev is None or score > prev:
                 best_score_by_id[rid] = score
 
-        ####MODULO sin renrank
+        ###MODULO sin renrank
         # reranked = docs
 
 
