@@ -126,7 +126,7 @@ def retrieve(
         must.append(models.FieldCondition(key="doc_id", match=models.MatchValue(value=doc_id)))
     if paper_date:
         must.append(models.FieldCondition(key=date_key, match=models.MatchValue(value=paper_date)))
-
+    
     qdrant_filter = models.Filter(must=must) if must else None
     results = store.similarity_search(query=query, k=k_val, filter=qdrant_filter)
 

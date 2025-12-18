@@ -64,40 +64,50 @@ def _doc_to_debug_row(doc: Any, max_chars: int = 240) -> Dict[str, Any]:
     }
 
 
-def _render_per_query_details(title: str, rows: List[Dict[str, Any]]) -> None:
-    """
-    Render per-query benchmark details in a collapsible expander with a selector and scroll.
-
-    Args:
-        title: Section title.
-        rows: Per-query rows from benchmark.
-    """
-    st.write("### Detalle por consulta")
+def _render_per_query_details(title: str, rows: List[Dict[str, Any]], key_prefix: str) -> None:
+    st.write(f"### {title}")
     if not rows:
         st.info("No hay consultas en el set de evaluación.")
         return
 
-    with st.expander(title, expanded=False):
+    selector_key = f"{key_prefix}_query_selector"
+
+    # Inicializar SOLO si no existe
+    if selector_key not in st.session_state:
+        st.session_state[selector_key] = 0
+
+    with st.expander(f"Ver {title}", expanded=False):
         labels = [f"{i+1}) {r['query']}" for i, r in enumerate(rows)]
-        sel = st.selectbox("Selecciona una consulta", options=list(range(len(rows))), format_func=lambda i: labels[i])
+
+        sel = st.selectbox(
+            "Selecciona una consulta para inspeccionar",
+            options=list(range(len(rows))),
+            format_func=lambda i: labels[i],
+            key=selector_key
+        )
+
         row = rows[sel]
 
         st.write(
-            f"**Hits:** {row['num_hits']} | **Precision@{row['k_eval']}:** {row['precision']:.3f} | "
-            f"**Recall@{row['k_eval']}:** {row['recall']:.3f} | **PWP:** {row['position_weighted_precision_at_k']:.3f}"
+            f"**Hits:** {row['num_hits']} | "
+            f"**Precision@{row['k_eval']}:** {row['precision']:.3f} | "
+            f"**Recall@{row['k_eval']}:** {row['recall']:.3f} | "
+            f"**PWP:** {row['position_weighted_precision_at_k']:.3f}"
         )
 
         box = st.container(height=320)
         with box:
-            st.json(
-                {
-                    "query": row["query"],
-                    "retrieved": row["retrieved_doc_ids"],
-                    "relevant": row["relevant_doc_ids"],
-                    "k_eval": row["k_eval"],
-                    "retrieve_k": row["retrieve_k"],
+            st.json({
+                "query": row["query"],
+                "retrieved": row["retrieved_doc_ids"],
+                "relevant": row["relevant_doc_ids"],
+                "metrics": {
+                    "hits": row["num_hits"],
+                    "precision": row["precision"],
+                    "recall": row["recall"]
                 }
-            )
+            })
+
 
 
 if "pipeline_ready" not in st.session_state:
@@ -250,19 +260,33 @@ st.subheader("Evaluar desempeño del recuperador (Benchmark)")
 
 k_eval = st.slider("k para métricas (Precision@k / Recall@k)", min_value=1, max_value=20, value=5, step=1)
 
-if st.button("Ejecutar Benchmark"):
-    metrics = eval_metrics_at_k(client, k_eval=int(k_eval))
+# 1. Inicializar el estado de sesión si no existe
+if "benchmark_results" not in st.session_state:
+    st.session_state.benchmark_results = None
 
+# 2. El botón SOLO gatilla el cálculo y lo guarda en la sesión
+if st.button("Ejecutar Benchmark"):
+    with st.spinner("Ejecutando evaluación completa..."):
+        st.session_state.benchmark_results = eval_metrics_at_k(client, k_eval=int(k_eval))
+    st.success("¡Benchmark finalizado!")
+
+# 3. La visualización ocurre SIEMPRE que haya datos en la sesión (fuera del bloque del botón)
+if st.session_state.benchmark_results is not None:
+    metrics = st.session_state.benchmark_results
+    
     st.subheader("Evaluación con Baseline (hybrid retrieve, sin LLM steps)")
     st.write(f"**Precision@{metrics['k_eval']} Baseline:** {metrics['precision_at_k_naive']:.3f}")
     st.write(f"**Position weighted precision@{metrics['k_eval']} Baseline:** {metrics['pwp_naive']:.3f}")
     st.write(f"**Recall@{metrics['k_eval']} Baseline:** {metrics['recall_at_k_naive']:.3f}")
 
-    _render_per_query_details("Detalle por consulta (Baseline)", metrics["per_query_naive"])
+    # Ahora el selector funcionará sin reiniciar el cálculo
+    _render_per_query_details("Detalle por consulta (Baseline)", metrics["per_query_naive"], key_prefix="baseline")
+
+    st.divider()
 
     st.subheader("Evaluación con Pipeline Final (filters + decomposition + HyDE + rerank)")
     st.write(f"**Precision@{metrics['k_eval']} Final:** {metrics['precision_at_k_processed']:.3f}")
     st.write(f"**Position weighted precision@{metrics['k_eval']} Final:** {metrics['pwp_processed']:.3f}")
     st.write(f"**Recall@{metrics['k_eval']} Final:** {metrics['recall_at_k_processed']:.3f}")
 
-    _render_per_query_details("Detalle por consulta (Final)", metrics["per_query_processed"])
+    _render_per_query_details("Detalle por consulta (Final)", metrics["per_query_processed"], key_prefix="final")

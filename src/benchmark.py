@@ -10,8 +10,12 @@ from ReRank import rerank
 from ReWrite import decompose_query, generate_hyde_document
 from project_config import cfg
 
+from pathlib import Path
+import sys
+root = Path(__file__).resolve().parents[1]
+sys.path.append(str(root))
 
-EVAL_PATH = Path("data/processed/set_eval.json")
+EVAL_PATH = root / "data" / "processed" / "set_eval.json"
 
 DEFAULT_EVAL_SET = [
     {
@@ -38,16 +42,25 @@ def position_weighted_precision(retrieved_ids: List[str], relevant_ids: Set[str]
     return 0.0
 
 
-def load_eval_set() -> List[Dict[str, Any]]:
-    """
-    Load an evaluation set from disk, or return a default set.
+# def load_eval_set() -> List[Dict[str, Any]]:
+#     """
+#     Load an evaluation set from disk, or return a default set.
 
-    Returns:
-        List of evaluation items with keys: query, relevant_doc_ids.
-    """
-    if EVAL_PATH.is_file():
-        return json.loads(EVAL_PATH.read_text(encoding="utf-8"))
-    return DEFAULT_EVAL_SET
+#     Returns:
+#         List of evaluation items with keys: query, relevant_doc_ids.
+#     """
+#     if EVAL_PATH.is_file():
+#         with EVAL_PATH.open("r", encoding="utf-8") as f:
+#             return json.load(f)
+#     return DEFAULT_EVAL_SET
+
+def load_eval_set(path: Path = EVAL_PATH):
+    if not path.exists():
+        print(f"[WARN] {path} no encontrado. Usando DEFAULT_EVAL_SET.")
+        return DEFAULT_EVAL_SET
+
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _normalize_relevant_ids(rel: Any) -> Set[str]:
@@ -143,18 +156,28 @@ def _run_processed(client: Any, query: str, retrieve_k: int, k_eval: int) -> Lis
     except Exception:
         doc_id, paper_date = None, None
 
-    try:
-        subqueries = decompose_query(query)
-    except Exception:
-        subqueries = [query]
+    ####MODULO con subquery
+
+    # try:
+    #     subqueries = decompose_query(query)
+    # except Exception:
+    #     subqueries = [query]
+
+    ####MODULO sin subquery
+    subqueries = [query]
 
     best_score_by_id: Dict[str, float] = {}
 
     for subq in subqueries:
-        try:
-            hyde_text = generate_hyde_document(subq)
-        except Exception:
-            hyde_text = subq
+
+        ####MODULO con hyde
+        # try:
+        #     hyde_text = generate_hyde_document(subq)
+        # except Exception:
+        #     hyde_text = subq
+
+        ####MODULO sin hyde
+        hyde_text = subq
 
         docs = retrieve(
             client,
@@ -164,6 +187,7 @@ def _run_processed(client: Any, query: str, retrieve_k: int, k_eval: int) -> Lis
             paper_date=paper_date,
         )
 
+        ###MODULO con renrank
         reranked = rerank(query, docs)  # Uses cfg.RERANK_TOP_K internally
 
         for item in reranked:
@@ -172,6 +196,17 @@ def _run_processed(client: Any, query: str, retrieve_k: int, k_eval: int) -> Lis
             prev = best_score_by_id.get(rid)
             if prev is None or score > prev:
                 best_score_by_id[rid] = score
+
+        ####MODULO sin renrank
+        # reranked = docs
+
+
+        # for item in reranked:
+        #     rid = f"{item.metadata.get('doc_id')}:{item.metadata.get('order')}"
+        #     score = float(item.metadata.get("score", 0.0))
+        #     prev = best_score_by_id.get(rid)
+        #     if prev is None or score > prev:
+        #         best_score_by_id[rid] = score
 
     ranked_ids = sorted(best_score_by_id.items(), key=lambda x: x[1], reverse=True)
     return [rid for rid, _ in ranked_ids[:k_eval]]
@@ -190,13 +225,12 @@ def eval_metrics_at_k(client: Any, k_eval: int = 5) -> Dict[str, Any]:
         Metrics dictionary including per-query details.
     """
     eval_set = load_eval_set()
-
     retrieve_k = int(getattr(cfg, "RETRIEVE_TOP_K", 50))
     # Note: rerank depth is controlled by cfg.RERANK_TOP_K in ReRank.rerank()
 
     per_query_naive: List[Dict[str, Any]] = []
     per_query_processed: List[Dict[str, Any]] = []
-
+    i=0
     for item in eval_set:
         query = item["query"]
         relevant_ids = _normalize_relevant_ids(item.get("relevant_doc_ids"))
@@ -254,7 +288,7 @@ def eval_metrics_at_k(client: Any, k_eval: int = 5) -> Dict[str, Any]:
     macro_precision_processed = mean(r["precision"] for r in per_query_processed) if per_query_processed else 0.0
     macro_recall_processed = mean(r["recall"] for r in per_query_processed) if per_query_processed else 0.0
     macro_pwp_processed = mean(r["position_weighted_precision_at_k"] for r in per_query_processed) if per_query_processed else 0.0
-
+    i=i+1
     return {
         "k_eval": k_eval,
         "retrieve_k": retrieve_k,

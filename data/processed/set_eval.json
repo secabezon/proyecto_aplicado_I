@@ -1,59 +1,50 @@
 [
   {
     "query": "What are the main health concerns associated with synthetic food colorants like tartrazine?",
-    "relevant_doc_ids": {"order": 39, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
+    "relevant_doc_ids": {"order": 32, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
   },
   {
     "query": "Which natural antimicrobial compounds from plants can be used as food preservatives?",
-    "relevant_doc_ids": {"order":91, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
+    "relevant_doc_ids": {"order":76, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
   },
   {
     "query": "What is a food colorant?",
-    "relevant_doc_ids": {"order":30, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
+    "relevant_doc_ids": {"order":24, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
   },
   {
     "query": "What are the main differences between synthetic and natural food colorants?",
-    "relevant_doc_ids": {"order":44, "doc_id": "Natural_Food_Colorants_and_Preservatives"}
-  },
-    {
-    "query": "What adverse reactions and toxicological effects have been reported for synthetic food colorants such as tartrazine?",
-    "relevant_doc_ids": { "order": 39, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 27, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "Which plant-derived compounds exhibit antimicrobial activity suitable for use as natural food preservatives?",
-    "relevant_doc_ids": { "order": 91, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
-  },
-  {
-    "query": "How are food colorants defined and classified in food science?",
-    "relevant_doc_ids": { "order": 30, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 78, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "What are the key differences in safety and origin between synthetic and natural food colorants?",
-    "relevant_doc_ids": { "order": 44, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 21, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "What natural sources are commonly used to obtain food colorants?",
-    "relevant_doc_ids": { "order": 32, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 26, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "Which natural pigments are responsible for red and purple colors in foods?",
-    "relevant_doc_ids": { "order": 34, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 33, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "What are carotenoids and how are they used as natural food colorants?",
-    "relevant_doc_ids": { "order": 36, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 43, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "What preservation mechanisms are associated with phenolic compounds in foods?",
-    "relevant_doc_ids": { "order": 88, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 106, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "What advantages do natural food preservatives have over synthetic preservatives?",
-    "relevant_doc_ids": { "order": 86, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 74, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   },
   {
     "query": "Which factors limit the stability of natural food colorants during processing and storage?",
-    "relevant_doc_ids": { "order": 47, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
+    "relevant_doc_ids": { "order": 23, "doc_id": "Natural_Food_Colorants_and_Preservatives" }
   }
-
 ]
