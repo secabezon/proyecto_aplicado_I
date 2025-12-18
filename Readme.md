@@ -2,7 +2,6 @@
 
 ## Autores
 
--   Ordelis Lameda\
 -   Sebastián Cabezón\
 -   Byron Hidalgo
 
